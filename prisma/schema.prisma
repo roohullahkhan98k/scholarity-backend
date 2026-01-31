@@ -10,15 +10,83 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
+  name      String
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
   roleId    String
   role      Role     @relation(fields: [roleId], references: [id])
+  
+  instructorApplications InstructorApplication[]
+  teacher   Teacher?
+  student   Student?
 }
 
 model Role {
   id    String @id @default(uuid())
   name  String @unique
   users User[]
+}
+
+model Teacher {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  bio         String?
+  expertise   String?
+  experience  String?
+  
+  rating      Float?   @default(0)
+  totalStudents Int    @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+model Student {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  bio         String?
+  interests   String?
+  
+  enrolledCourses Int @default(0)
+  completedCourses Int @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+model InstructorApplication {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  bio         String
+  expertise   String
+  experience  String
+  
+  status      ApplicationStatus @default(PENDING)
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  rejectionReason String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
