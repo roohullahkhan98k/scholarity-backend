@@ -23,11 +23,198 @@ model User {
   student   Student?
 }
 
+// =======================
+// [NEW] RBAC System
+// =======================
+
 model Role {
-  id    String @id @default(uuid())
-  name  String @unique
-  users User[]
+  id          String       @id @default(uuid())
+  name        String       @unique // "SUPER_ADMIN", "ADMIN", "REVIEWER", "TEACHER", "STUDENT"
+  users       User[]
+  permissions Permission[] // Implicit many-to-many
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique // "MANAGE_USERS", "APPROVE_COURSE"
+  roles       Role[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// =======================
+// [NEW] Academic Structure
+// =======================
+
+model AcademicCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g., "UG", "11th"
+  subjects  Subject[]
+  courses   Course[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String
+  categoryId  String
+  category    AcademicCategory @relation(fields: [categoryId], references: [id])
+  courses     Course[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([name, categoryId])
+}
+
+// =======================
+// [NEW] Course Management
+// =======================
+
+model Course {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @db.Text
+  thumbnail   String?
+  price       Float    @default(0) // 0 = Free
+  duration    Int      // Total minutes (calculated)
+  
+  status      CourseStatus @default(DRAFT)
+  
+  teacherId   String
+  teacher     Teacher  @relation(fields: [teacherId], references: [id])
+  
+  categoryId  String
+  category    AcademicCategory @relation(fields: [categoryId], references: [id])
+  
+  subjectId   String
+  subject     Subject @relation(fields: [subjectId], references: [id])
+  
+  semester     Int?     // Optional semester number
+  
+  units       Unit[]
+  enrollments Enrollment[]
+  resources   Resource[]
+  
+  adminComments String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum CourseStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  DISABLED
+}
+
+model Unit {
+  id        String   @id @default(uuid())
+  title     String
+  order     Int
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons   Lesson[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  duration    Int      // Seconds
+  videoUrl    String?
+  isFree      Boolean  @default(false)
+  type        LessonType @default(VIDEO)
+  order       Int
+  
+  unitId      String
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  
+  progress    LessonProgress[]
+  resources   Resource[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum LessonType {
+  VIDEO
+  DOCUMENT
+  QUIZ
+}
+
+model Resource {
+  id        String   @id @default(uuid())
+  title     String
+  url       String
+  type      ResourceType 
+  
+  courseId  String?
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  lessonId  String?
+  lesson    Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+}
+
+enum ResourceType {
+  SYLLABUS
+  NOTE
+  PYQ
+  OTHER
+}
+
+// =======================
+// [NEW] Enrollment & Progress
+// =======================
+
+model Enrollment {
+  id          String   @id @default(uuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  progress    Float    @default(0) // Percentage (0-100)
+  completed   Boolean  @default(false)
+  
+  enrolledAt  DateTime @default(now())
+  
+  @@unique([studentId, courseId])
+}
+
+model LessonProgress {
+  id           String   @id @default(uuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  lessonId     String
+  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  completed    Boolean  @default(false)
+  lastPosition Int      @default(0) // Seconds
+  
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([studentId, lessonId])
+}
+
+// =======================
+// User Types
+// =======================
 
 model Teacher {
   id          String   @id @default(uuid())
@@ -40,6 +227,8 @@ model Teacher {
   
   rating      Float?   @default(0)
   totalStudents Int    @default(0)
+  
+  courses     Course[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -57,6 +246,9 @@ model Student {
   
   enrolledCourses Int @default(0)
   completedCourses Int @default(0)
+  
+  enrollments Enrollment[]
+  lessonProgress LessonProgress[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
