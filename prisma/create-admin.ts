@@ -1,8 +1,6 @@
-import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../src/prisma';
 import * as bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
 
 async function main() {
     console.log('Starting admin user creation...');
@@ -13,16 +11,16 @@ async function main() {
 
         // Get admin role
         const adminRole = await prisma.role.findUnique({
-            where: { name: 'admin' },
+            where: { name: 'SUPER_ADMIN' },
         });
 
         if (!adminRole) {
-            throw new Error('Admin role not found');
+            throw new Error('SUPER_ADMIN role not found');
         }
 
         // Check if admin user already exists
         const existingAdmin = await prisma.user.findUnique({
-            where: { email: 'admin@scholarity.com' },
+            where: { email: 'superadmin@scholarity.com' },
         });
 
         if (existingAdmin) {
@@ -35,16 +33,16 @@ async function main() {
 
         const admin = await prisma.user.create({
             data: {
-                email: 'admin@scholarity.com',
+                email: 'superadmin@scholarity.com',
                 password: hashedPassword,
-                name: 'Admin User',
+                name: 'Super Admin',
                 roleId: adminRole.id,
                 isActive: true,
             },
         });
 
         console.log('✅ Admin user created successfully!');
-        console.log('Email: admin@scholarity.com');
+        console.log('Email: superadmin@scholarity.com');
         console.log('Password: Admin123!');
 
     } catch (e) {

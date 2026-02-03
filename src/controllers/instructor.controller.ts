@@ -4,6 +4,7 @@ import { ApplicationStatus } from '@prisma/client';
 
 export const apply = async (req: Request, res: Response) => {
     try {
+        if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
         const result = await InstructorService.applyForInstructor(req.user.id, req.body);
         res.status(201).json(result);
     } catch (error: any) {
@@ -23,6 +24,7 @@ export const getApplications = async (req: Request, res: Response) => {
 
 export const reviewApplication = async (req: Request, res: Response) => {
     try {
+        if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
         const { id } = req.params;
         const result = await InstructorService.reviewApplication(id as string, req.body, req.user.id);
         res.status(200).json(result);

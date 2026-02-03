@@ -1,9 +1,7 @@
-import { Request } from 'express';
+import 'express';
 
-declare global {
-    namespace Express {
-        interface Request {
-            user?: any;
-        }
+declare module 'express' {
+    export interface Request {
+        user?: any;
     }
 }

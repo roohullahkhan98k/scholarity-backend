@@ -21,7 +21,8 @@ export const login = async (req: Request, res: Response) => {
 
 export const getProfile = async (req: Request, res: Response) => {
     try {
-        const result = await AuthService.getProfile(req.user.id);
+        if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+        const result = await AuthService.getProfile((req.user as any).id);
         res.status(200).json(result);
     } catch (error: any) {
         res.status(error.status || 500).json({ message: error.message || 'Internal Server Error' });
@@ -29,8 +30,9 @@ export const getProfile = async (req: Request, res: Response) => {
 };
 
 export const logout = async (req: Request, res: Response) => {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
     res.status(200).json({
         message: 'Logged out successfully',
-        userId: req.user.id,
+        userId: (req.user as any).id,
     });
 };

@@ -14,7 +14,7 @@ export const authorize = (roles: string[]) => {
 
         try {
             const user = await prisma.user.findUnique({
-                where: { id: req.user.id },
+                where: { id: (req.user as any).id },
                 include: { role: true }
             });
 
