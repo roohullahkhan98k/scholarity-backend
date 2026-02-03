@@ -12,6 +12,15 @@ export const apply = async (req: Request, res: Response) => {
     }
 };
 
+export const publicJoin = async (req: Request, res: Response) => {
+    try {
+        const result = await InstructorService.publicJoinAsInstructor(req.body);
+        res.status(201).json(result);
+    } catch (error: any) {
+        res.status(error.status || 500).json({ message: error.message || 'Internal Server Error' });
+    }
+};
+
 export const getApplications = async (req: Request, res: Response) => {
     try {
         const status = req.query.status as ApplicationStatus;

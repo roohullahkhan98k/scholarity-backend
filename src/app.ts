@@ -34,13 +34,14 @@ app.use('/api/teacher', teacherRoutes); // Profile & Verification
 app.use('/api/courses', courseRoutes); // Course Management
 app.use('/api/upload', uploadRoutes);
 // app.use('/api/students', studentsRoutes);
-app.use('/api/instructor', instructorRoutes); // Keeping legacy for now if needed, but teacher.routes.ts covers profile. 
+app.use('/api/instructor', instructorRoutes); // Public & Student endpoints
 app.use('/api/academic', academicRoutes);
 
 // Admin Routes
 app.use('/api/admin', adminUserRoutes); // /users...
 app.use('/api/admin', adminRoleRoutes); // /roles...
 app.use('/api/admin/courses', adminCourseRoutes); // /pending, /:id/approve
+app.use('/api/admin/instructor', instructorRoutes); // /applications
 
 
 // Health check

@@ -3,7 +3,19 @@ import prisma from '../src/prisma';
 async function main() {
     console.log('🌱 Seeding Academic Categories & Subjects...');
 
-    // Academic Categories & Subjects
+    // 1. Roles
+    console.log('👥 Seeding Roles...');
+    const roles = ['student', 'teacher', 'admin', 'SUPER_ADMIN'];
+    for (const roleName of roles) {
+        await prisma.role.upsert({
+            where: { name: roleName },
+            update: {},
+            create: { name: roleName }
+        });
+    }
+    console.log('✅ Roles seeded.');
+
+    // 2. Academic Categories & Subjects
     const academicData = [
         {
             name: '11th Class',

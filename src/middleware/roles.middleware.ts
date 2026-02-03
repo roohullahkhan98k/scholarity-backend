@@ -22,7 +22,8 @@ export const authorize = (roles: string[]) => {
                 return res.status(401).json({ message: 'User not found' });
             }
 
-            if (!roles.includes(user.role.name)) {
+            const hasRole = roles.map(r => r.toLowerCase()).includes(user.role.name.toLowerCase());
+            if (!hasRole) {
                 return res.status(403).json({ message: 'Forbidden resource' });
             }
 

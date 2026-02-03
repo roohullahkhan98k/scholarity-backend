@@ -1,5 +1,5 @@
 import prisma from '../prisma';
-import { CourseStatus, LessonType } from '@prisma/client';
+import { CourseStatus, LessonType, ResourceType } from '@prisma/client';
 
 export class CourseService {
 
@@ -32,6 +32,40 @@ export class CourseService {
         });
     }
 
+    // Update Course Draft
+    static async updateCourse(courseId: string, teacherUserId: string, data: {
+        title?: string;
+        description?: string;
+        categoryId?: string;
+        subjectId?: string;
+        thumbnail?: string;
+        price?: number;
+    }) {
+        const teacher = await prisma.teacher.findUnique({ where: { userId: teacherUserId } });
+        if (!teacher) throw new Error('Teacher profile not found.');
+
+        const course = await prisma.course.findUnique({ where: { id: courseId } });
+        if (!course) throw new Error('Course not found');
+        if (course.teacherId !== teacher.id) throw new Error('Unauthorized');
+
+        return prisma.course.update({
+            where: { id: courseId },
+            data: {
+                title: data.title,
+                description: data.description,
+                categoryId: data.categoryId,
+                subjectId: data.subjectId,
+                thumbnail: data.thumbnail,
+                price: data.price,
+                // Critical: Identifying edits to live content
+                // If course was APPROVED or REJECTED, and teacher edits it -> Reset to PENDING for re-review
+                status: (course.status === CourseStatus.APPROVED || course.status === CourseStatus.REJECTED)
+                    ? CourseStatus.PENDING
+                    : course.status // Keep as DRAFT or PENDING
+            }
+        });
+    }
+
     // Add Unit to Course
     static async addUnit(courseId: string, title: string, order: number) {
         return prisma.unit.create({
@@ -46,21 +80,52 @@ export class CourseService {
     // Add Lesson to Unit
     static async addLesson(unitId: string, data: {
         title: string;
-        order: number;
-        type: LessonType;
-        duration: number;
-        videoUrl?: string; // Can be YouTube or S3 URL
+        order?: number;
+        type?: LessonType;
+        duration?: number;
+        videoUrl?: string; // YouTube or Uploaded Video URL
         isFree?: boolean;
+        resources?: Array<{ title: string; url: string; type: any }>; // Support multiple documents
     }) {
+        // Smart Defaulting for Type
+        let lessonType = data.type;
+        if (!lessonType) {
+            if (data.videoUrl) lessonType = LessonType.VIDEO;
+            else if (data.resources && data.resources.length > 0) lessonType = LessonType.DOCUMENT;
+            else lessonType = LessonType.VIDEO; // Fallback
+        }
+
         return prisma.lesson.create({
             data: {
                 title: data.title,
-                order: data.order,
-                type: data.type,
-                duration: data.duration,
+                order: data.order || 1, // Default order
+                type: lessonType,
+                duration: data.duration || 0,
                 videoUrl: data.videoUrl,
                 isFree: data.isFree || false,
-                unitId
+                unitId,
+                resources: data.resources ? {
+                    create: data.resources.map(r => {
+                        // Handle if resource is just a string URL (flat array)
+                        if (typeof r === 'string') {
+                            const filename = (r as string).split('/').pop() || 'Resource';
+                            return {
+                                title: filename,
+                                url: r,
+                                type: ResourceType.OTHER
+                            };
+                        }
+                        // Handle object
+                        return {
+                            title: r.title,
+                            url: r.url,
+                            type: (r.type as ResourceType) || ResourceType.OTHER
+                        };
+                    })
+                } : undefined
+            },
+            include: {
+                resources: true
             }
         });
     }
@@ -87,7 +152,8 @@ export class CourseService {
                 units: {
                     include: {
                         lessons: {
-                            orderBy: { order: 'asc' }
+                            orderBy: { order: 'asc' },
+                            include: { resources: true }
                         }
                     },
                     orderBy: { order: 'asc' }
@@ -187,6 +253,52 @@ export class CourseService {
             where: { courseId },
             include: { user: { select: { name: true, email: true, role: true } } },
             orderBy: { createdAt: 'desc' }
+        });
+    }
+
+    // Delete Course (Teacher: Draft Only, Admin: Any)
+    static async deleteCourse(courseId: string, userId: string, role: string) {
+        const course = await prisma.course.findUnique({ where: { id: courseId } });
+        if (!course) throw new Error('Course not found');
+
+        // Teacher Logic
+        if (role === 'teacher') {
+            const teacher = await prisma.teacher.findUnique({ where: { userId } });
+            if (!teacher || course.teacherId !== teacher.id) throw new Error('Unauthorized');
+            if (course.status !== CourseStatus.DRAFT && course.status !== CourseStatus.REJECTED) {
+                throw new Error('You can only delete Draft or Rejected courses.');
+            }
+        }
+
+        // Admin can delete anything, Teacher matches logic above
+        return prisma.course.delete({ where: { id: courseId } });
+    }
+
+    // Toggle Course Status (Activate/Deactivate)
+    static async toggleCourseStatus(courseId: string, userId: string, role: string) {
+        const course = await prisma.course.findUnique({ where: { id: courseId } });
+        if (!course) throw new Error('Course not found');
+
+        let newStatus: CourseStatus;
+
+        if (role === 'teacher') {
+            const teacher = await prisma.teacher.findUnique({ where: { userId } });
+            if (!teacher || course.teacherId !== teacher.id) throw new Error('Unauthorized');
+
+            // Teacher can only toggle Published <-> Disabled (Unpublish)
+            if (course.status === CourseStatus.APPROVED) newStatus = CourseStatus.DISABLED;
+            else if (course.status === CourseStatus.DISABLED) newStatus = CourseStatus.APPROVED;
+            else throw new Error('Only active courses can be deactivated.');
+        } else {
+            // Admin Logic
+            if (course.status === CourseStatus.APPROVED) newStatus = CourseStatus.DISABLED;
+            else if (course.status === CourseStatus.DISABLED) newStatus = CourseStatus.APPROVED;
+            else throw new Error('Course is not in a togglable state.');
+        }
+
+        return prisma.course.update({
+            where: { id: courseId },
+            data: { status: newStatus }
         });
     }
 

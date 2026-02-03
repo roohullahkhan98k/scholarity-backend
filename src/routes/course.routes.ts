@@ -11,19 +11,30 @@ router.use(authenticate);
 router.get('/', CourseController.listCourses);
 
 // List My Courses
+router.get('/my', CourseController.getMyCourses);
 router.get('/my-courses', CourseController.getMyCourses);
 
 // Get Course Details (Editor View)
 router.get('/:id', CourseController.getCourseDetails);
 
 // Create Draft
-router.post('/', authorize(['TEACHER', 'SUPER_ADMIN']), CourseController.createCourse);
+router.post('/', authorize(['teacher', 'SUPER_ADMIN']), CourseController.createCourse);
+
+// Update Draft (Resume/Edit)
+router.put('/:id', authorize(['teacher', 'SUPER_ADMIN']), CourseController.updateCourse);
 
 // Add Content
-router.post('/:courseId/units', authorize(['TEACHER', 'SUPER_ADMIN']), CourseController.addUnit);
-router.post('/:unitId/lessons', authorize(['TEACHER', 'SUPER_ADMIN']), CourseController.addLesson);
+router.post('/:courseId/units', authorize(['teacher', 'SUPER_ADMIN']), CourseController.addUnit);
+router.post('/:unitId/lessons', authorize(['teacher', 'SUPER_ADMIN']), CourseController.addLesson);
 
 // Submission
-router.post('/:id/submit', authorize(['TEACHER', 'SUPER_ADMIN']), CourseController.submitForReview);
+// Submission
+router.post('/:id/submit', authorize(['teacher', 'SUPER_ADMIN']), CourseController.submitForReview);
+
+// Delete Course
+router.delete('/:id', authorize(['teacher', 'SUPER_ADMIN']), CourseController.deleteCourse);
+
+// Toggle Status (Activate/Deactivate)
+router.patch('/:id/status', authorize(['teacher', 'SUPER_ADMIN']), CourseController.toggleCourseStatus);
 
 export default router;

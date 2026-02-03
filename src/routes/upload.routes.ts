@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth.middleware';
 const router = Router();
 
 // Single video upload
-router.post('/video', authenticate, upload.single('video'), (req, res) => {
+router.post('/video', authenticate, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
     res.status(200).json({
@@ -15,7 +15,7 @@ router.post('/video', authenticate, upload.single('video'), (req, res) => {
 });
 
 // Single PDF upload
-router.post('/pdf', authenticate, upload.single('pdf'), (req, res) => {
+router.post('/pdf', authenticate, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
     res.status(200).json({

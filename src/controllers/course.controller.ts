@@ -17,6 +17,22 @@ export const createCourse = async (req: Request, res: Response) => {
     }
 };
 
+export const updateCourse = async (req: Request, res: Response) => {
+    try {
+        if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+        const { id } = req.params;
+        const { title, description, categoryId, subjectId, thumbnail, price } = req.body;
+
+        const course = await CourseService.updateCourse(id, (req.user as any).id, {
+            title, description, categoryId, subjectId, thumbnail, price
+        });
+
+        res.status(200).json(course);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 export const addUnit = async (req: Request, res: Response) => {
     try {
         const { courseId } = req.params;
@@ -32,10 +48,13 @@ export const addUnit = async (req: Request, res: Response) => {
 export const addLesson = async (req: Request, res: Response) => {
     try {
         const { unitId } = req.params;
-        const { title, order, type, duration, videoUrl, isFree } = req.body;
+        const { title, order, type, duration, videoUrl, isFree, resources } = req.body;
+
+        console.log('➡️ [API] Add Lesson Request:', { unitId });
+        console.log('📦 [API] Payload:', { title, type, resourcesLength: resources?.length });
 
         const lesson = await CourseService.addLesson(unitId as string, {
-            title, order, type, duration, videoUrl, isFree
+            title, order, type, duration, videoUrl, isFree, resources
         });
 
         res.status(201).json(lesson);
@@ -88,6 +107,28 @@ export const listCourses = async (req: Request, res: Response) => {
             page: page ? parseInt(page as string) : undefined,
             limit: limit ? parseInt(limit as string) : undefined
         });
+        res.status(200).json(result);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const deleteCourse = async (req: Request, res: Response) => {
+    try {
+        if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+        const { id } = req.params;
+        await CourseService.deleteCourse(id as string, (req.user as any).id, (req.user as any).role);
+        res.status(200).json({ message: 'Course deleted successfully' });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const toggleCourseStatus = async (req: Request, res: Response) => {
+    try {
+        if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+        const { id } = req.params;
+        const result = await CourseService.toggleCourseStatus(id as string, (req.user as any).id, (req.user as any).role);
         res.status(200).json(result);
     } catch (error: any) {
         res.status(500).json({ message: error.message });

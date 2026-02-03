@@ -10,7 +10,7 @@ router.get('/categories', AcademicController.listCategories);
 router.get('/subjects', AcademicController.listSubjects);
 
 // Category/Subject Requests (Teacher)
-router.post('/requests', authenticate, authorize(['TEACHER', 'SUPER_ADMIN']), AcademicController.requestAcademicItem);
+router.post('/requests', authenticate, authorize(['teacher', 'SUPER_ADMIN']), AcademicController.requestAcademicItem);
 
 // Admin Only - Resolve Requests
 router.get('/requests', authenticate, authorize(['SUPER_ADMIN']), AcademicController.listAcademicRequests);
