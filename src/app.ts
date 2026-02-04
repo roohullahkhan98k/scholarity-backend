@@ -11,6 +11,7 @@ import adminUserRoutes from './routes/admin/user.routes';
 import adminRoleRoutes from './routes/admin/role.routes';
 import adminCourseRoutes from './routes/admin/course.routes';
 import teacherRoutes from './routes/teacher.routes';
+import teachersRoutes from './routes/teachers.routes';
 import courseRoutes from './routes/course.routes';
 import uploadRoutes from './routes/upload.routes';
 import { errorHandler } from './middleware/error.middleware';
@@ -31,6 +32,7 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/teacher', teacherRoutes); // Profile & Verification
+app.use('/api/teachers', teachersRoutes); // Admin/Public list of teachers
 app.use('/api/courses', courseRoutes); // Course Management
 app.use('/api/upload', uploadRoutes);
 // app.use('/api/students', studentsRoutes);

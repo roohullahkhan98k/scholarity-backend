@@ -55,7 +55,13 @@ export const TeachersService = {
             },
             include: {
                 role: true,
-                teacher: true,
+                teacher: {
+                    include: {
+                        _count: {
+                            select: { courses: true }
+                        }
+                    }
+                },
                 instructorApplications: {
                     orderBy: { createdAt: 'desc' },
                     take: 1,
@@ -78,6 +84,7 @@ export const TeachersService = {
             experience: user.teacher?.experience || user.instructorApplications[0]?.experience,
             rating: user.teacher?.rating || 0,
             totalStudents: user.teacher?.totalStudents || 0,
+            totalCourses: user.teacher?._count?.courses || 0,
             applicationStatus: user.instructorApplications[0]?.status || (user.role.name === 'teacher' ? 'APPROVED' : null),
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,

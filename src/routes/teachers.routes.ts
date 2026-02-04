@@ -10,10 +10,10 @@ const router = Router();
 
 router.use(authenticate);
 
-router.post('/', authorize(['admin']), validateDto(CreateTeacherDto), TeachersController.create);
+router.post('/', authorize(['admin', 'SUPER_ADMIN']), validateDto(CreateTeacherDto), TeachersController.create);
 router.get('/', TeachersController.findAll);
 router.get('/:id', TeachersController.findOne);
-router.patch('/:id', authorize(['admin']), validateDto(UpdateTeacherDto), TeachersController.update);
-router.delete('/:id', authorize(['admin']), TeachersController.remove);
+router.patch('/:id', authorize(['admin', 'SUPER_ADMIN']), validateDto(UpdateTeacherDto), TeachersController.update);
+router.delete('/:id', authorize(['admin', 'SUPER_ADMIN']), TeachersController.remove);
 
 export default router;

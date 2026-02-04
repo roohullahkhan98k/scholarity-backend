@@ -33,7 +33,8 @@ export class CourseService {
     }
 
     // Update Course Draft
-    static async updateCourse(courseId: string, teacherUserId: string, data: {
+    // Update Course Draft
+    static async updateCourse(courseId: string, teacherUserId: string, role: any, data: {
         title?: string;
         description?: string;
         categoryId?: string;
@@ -41,12 +42,17 @@ export class CourseService {
         thumbnail?: string;
         price?: number;
     }) {
-        const teacher = await prisma.teacher.findUnique({ where: { userId: teacherUserId } });
-        if (!teacher) throw new Error('Teacher profile not found.');
-
         const course = await prisma.course.findUnique({ where: { id: courseId } });
         if (!course) throw new Error('Course not found');
-        if (course.teacherId !== teacher.id) throw new Error('Unauthorized');
+
+        // Authorization Check
+        const currentRole = typeof role === 'object' ? role?.name : role;
+        const normalizedRole = (currentRole || '').toUpperCase();
+
+        if (normalizedRole !== 'ADMIN' && normalizedRole !== 'SUPER_ADMIN') {
+            const teacher = await prisma.teacher.findUnique({ where: { userId: teacherUserId } });
+            if (!teacher || course.teacherId !== teacher.id) throw new Error('Unauthorized');
+        }
 
         return prisma.course.update({
             where: { id: courseId },
@@ -59,9 +65,11 @@ export class CourseService {
                 price: data.price,
                 // Critical: Identifying edits to live content
                 // If course was APPROVED or REJECTED, and teacher edits it -> Reset to PENDING for re-review
-                status: (course.status === CourseStatus.APPROVED || course.status === CourseStatus.REJECTED)
+                // Admin edits do NOT reset status usually, or maybe they do? Let's keep it simple:
+                // If Teacher edits -> Reset. If Admin edits -> Keep status (Admin knows what they are doing).
+                status: (role === 'teacher' && (course.status === CourseStatus.APPROVED || course.status === CourseStatus.REJECTED))
                     ? CourseStatus.PENDING
-                    : course.status // Keep as DRAFT or PENDING
+                    : course.status
             }
         });
     }
@@ -106,13 +114,17 @@ export class CourseService {
                 unitId,
                 resources: data.resources ? {
                     create: data.resources.map(r => {
-                        // Handle if resource is just a string URL (flat array)
+                        // Handle if resource is just a string URL (flat array) -> Type: LINK (default for string)
                         if (typeof r === 'string') {
-                            const filename = (r as string).split('/').pop() || 'Resource';
+                            const url = r as string;
+                            let type = ResourceType.LINK;
+                            // Simple heuristic: if youtube or mp4, maybe VIDEO? But let's stick to safe default or LINK.
+                            // If user specifically wants VIDEO type, they should pass object.
+                            const filename = url.split('/').pop() || 'Resource';
                             return {
                                 title: filename,
-                                url: r,
-                                type: ResourceType.OTHER
+                                url: url,
+                                type: type
                             };
                         }
                         // Handle object
@@ -129,6 +141,58 @@ export class CourseService {
             }
         });
     }
+
+    // Update Lesson
+    static async updateLesson(lessonId: string, role: string, data: {
+        title?: string;
+        order?: number;
+        type?: LessonType;
+        duration?: number;
+        videoUrl?: string;
+        isFree?: boolean;
+        resources?: Array<{ title: string; url: string; type: any }>;
+    }) {
+        // 1. Verify Lesson Exists
+        const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+        if (!lesson) throw new Error('Lesson not found');
+
+        // 2. Perform Update Transaction
+        return prisma.$transaction(async (tx) => {
+            // If resources are provided, replace them:
+            if (data.resources) {
+                // Delete existing resources
+                await tx.resource.deleteMany({ where: { lessonId } });
+
+                // Prepare new resources
+                const newResources = data.resources.map(r => ({
+                    lessonId,
+                    title: r.title || 'Untitled Resource', // Fallback but Frontend should send title
+                    url: r.url,
+                    type: (r.type as ResourceType) || ResourceType.OTHER
+                }));
+
+                // Bulk Insert
+                if (newResources.length > 0) {
+                    await tx.resource.createMany({ data: newResources });
+                }
+            }
+
+            // Update Lesson Fields
+            return tx.lesson.update({
+                where: { id: lessonId },
+                data: {
+                    title: data.title,
+                    order: data.order,
+                    type: data.type,
+                    duration: data.duration,
+                    videoUrl: data.videoUrl,
+                    isFree: data.isFree
+                },
+                include: { resources: true }
+            });
+        });
+    }
+
 
     // Get Teacher's Courses
     static async getTeacherCourses(teacherUserId: string) {
@@ -149,6 +213,9 @@ export class CourseService {
         return prisma.course.findUnique({
             where: { id: courseId },
             include: {
+                teacher: { include: { user: { select: { name: true, email: true } } } },
+                category: true,
+                subject: true,
                 units: {
                     include: {
                         lessons: {
@@ -256,6 +323,31 @@ export class CourseService {
         });
     }
 
+    // Bulk Delete (Admin Only)
+    static async bulkDeleteCourses(courseIds: string[], userId: string, role: any, deleteAll: boolean = false) {
+        // Strict check: Only Admins/Super Admins
+        const currentRole = typeof role === 'object' ? role?.name : role;
+        const normalizedRole = (currentRole || '').toUpperCase();
+
+        if (normalizedRole !== 'ADMIN' && normalizedRole !== 'SUPER_ADMIN') {
+            throw new Error('Unauthorized. Only Admins can perform bulk deletion.');
+        }
+
+        if (deleteAll) {
+            // Extreme caution: Only Super Admin for "Delete All"
+            if (normalizedRole !== 'SUPER_ADMIN') {
+                throw new Error('Unauthorized. Only Super Admins can delete all courses.');
+            }
+            return prisma.course.deleteMany({});
+        }
+
+        return prisma.course.deleteMany({
+            where: {
+                id: { in: courseIds }
+            }
+        });
+    }
+
     // Delete Course (Teacher: Draft Only, Admin: Any)
     static async deleteCourse(courseId: string, userId: string, role: string) {
         const course = await prisma.course.findUnique({ where: { id: courseId } });
@@ -290,10 +382,11 @@ export class CourseService {
             else if (course.status === CourseStatus.DISABLED) newStatus = CourseStatus.APPROVED;
             else throw new Error('Only active courses can be deactivated.');
         } else {
-            // Admin Logic
+            // Admin Logic: Allow toggling ANY state
+            // If currently APPROVED, Disable it.
+            // If DISABLED, DRAFT, PENDING, REJECTED -> Approve it (Force Activate)
             if (course.status === CourseStatus.APPROVED) newStatus = CourseStatus.DISABLED;
-            else if (course.status === CourseStatus.DISABLED) newStatus = CourseStatus.APPROVED;
-            else throw new Error('Course is not in a togglable state.');
+            else newStatus = CourseStatus.APPROVED;
         }
 
         return prisma.course.update({
@@ -307,17 +400,19 @@ export class CourseService {
         search?: string;
         categoryId?: string;
         subjectId?: string;
+        teacherId?: string;
         status?: CourseStatus;
         page?: number;
         limit?: number;
     }) {
-        const { search, categoryId, subjectId, status, page = 1, limit = 10 } = filters;
+        const { search, categoryId, subjectId, teacherId, status, page = 1, limit = 10 } = filters;
         const skip = (page - 1) * limit;
 
         const where: any = {};
         if (status) where.status = status;
         if (categoryId) where.categoryId = categoryId;
         if (subjectId) where.subjectId = subjectId;
+        if (teacherId) where.teacherId = teacherId;
 
         if (search) {
             where.OR = [

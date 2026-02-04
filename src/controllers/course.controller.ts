@@ -23,7 +23,11 @@ export const updateCourse = async (req: Request, res: Response) => {
         const { id } = req.params;
         const { title, description, categoryId, subjectId, thumbnail, price } = req.body;
 
-        const course = await CourseService.updateCourse(id, (req.user as any).id, {
+        const userRole = typeof (req.user as any).role === 'object'
+            ? (req.user as any).role.name
+            : (req.user as any).role;
+
+        const course = await CourseService.updateCourse(id, (req.user as any).id, userRole, {
             title, description, categoryId, subjectId, thumbnail, price
         });
 
@@ -58,6 +62,21 @@ export const addLesson = async (req: Request, res: Response) => {
         });
 
         res.status(201).json(lesson);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const updateLesson = async (req: Request, res: Response) => {
+    try {
+        const { lessonId } = req.params;
+        const { title, order, type, duration, videoUrl, isFree, resources } = req.body;
+
+        const lesson = await CourseService.updateLesson(lessonId as string, (req.user as any).role, {
+            title, order, type, duration, videoUrl, isFree, resources
+        });
+
+        res.status(200).json(lesson);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }
@@ -98,11 +117,12 @@ export const submitForReview = async (req: Request, res: Response) => {
 
 export const listCourses = async (req: Request, res: Response) => {
     try {
-        const { search, categoryId, subjectId, status, page, limit } = req.query;
+        const { search, categoryId, subjectId, teacherId, status, page, limit } = req.query;
         const result = await CourseService.listCourses({
             search: search as string,
             categoryId: categoryId as string,
             subjectId: subjectId as string,
+            teacherId: teacherId as string,
             status: status as any,
             page: page ? parseInt(page as string) : undefined,
             limit: limit ? parseInt(limit as string) : undefined
@@ -119,6 +139,29 @@ export const deleteCourse = async (req: Request, res: Response) => {
         const { id } = req.params;
         await CourseService.deleteCourse(id as string, (req.user as any).id, (req.user as any).role);
         res.status(200).json({ message: 'Course deleted successfully' });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+
+
+export const bulkDeleteCourses = async (req: Request, res: Response) => {
+    try {
+        const { courseIds, deleteAll } = req.body;
+
+        if (!deleteAll && (!Array.isArray(courseIds) || courseIds.length === 0)) {
+            return res.status(400).json({ message: 'courseIds array is required unless deleteAll is true' });
+        }
+
+        // @ts-ignore
+        const { userId } = req.user;
+        const userRole = typeof (req.user as any).role === 'object'
+            ? (req.user as any).role.name
+            : (req.user as any).role;
+
+        await CourseService.bulkDeleteCourses(courseIds || [], userId, userRole, !!deleteAll);
+        res.status(200).json({ message: deleteAll ? 'All courses deleted successfully' : 'Courses deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }

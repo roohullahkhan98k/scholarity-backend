@@ -4,7 +4,7 @@ import fs from 'fs';
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = 'uploads/';
+        const uploadDir = path.join(process.cwd(), 'uploads');
         if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true });
         }
@@ -17,10 +17,12 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req: any, file: any, cb: any) => {
-    if (file.mimetype === 'application/pdf' || file.mimetype.startsWith('video/')) {
+    if (file.mimetype === 'application/pdf' ||
+        file.mimetype.startsWith('video/') ||
+        file.mimetype.startsWith('image/')) {
         cb(null, true);
     } else {
-        cb(new Error('Invalid file type. Only PDF and Videos are allowed.'), false);
+        cb(new Error('Invalid file type. Only Images, PDFs and Videos are allowed.'), false);
     }
 };
 

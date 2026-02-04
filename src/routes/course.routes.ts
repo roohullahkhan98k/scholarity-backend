@@ -18,23 +18,27 @@ router.get('/my-courses', CourseController.getMyCourses);
 router.get('/:id', CourseController.getCourseDetails);
 
 // Create Draft
-router.post('/', authorize(['teacher', 'SUPER_ADMIN']), CourseController.createCourse);
+router.post('/', authorize(['teacher', 'admin', 'SUPER_ADMIN']), CourseController.createCourse);
 
 // Update Draft (Resume/Edit)
-router.put('/:id', authorize(['teacher', 'SUPER_ADMIN']), CourseController.updateCourse);
+router.put('/:id', authorize(['teacher', 'admin', 'SUPER_ADMIN']), CourseController.updateCourse);
 
 // Add Content
-router.post('/:courseId/units', authorize(['teacher', 'SUPER_ADMIN']), CourseController.addUnit);
-router.post('/:unitId/lessons', authorize(['teacher', 'SUPER_ADMIN']), CourseController.addLesson);
+router.post('/:courseId/units', authorize(['teacher', 'admin', 'SUPER_ADMIN']), CourseController.addUnit);
+router.post('/:unitId/lessons', authorize(['teacher', 'admin', 'SUPER_ADMIN']), CourseController.addLesson);
+router.put('/lessons/:lessonId', authorize(['teacher', 'admin', 'SUPER_ADMIN']), CourseController.updateLesson);
 
 // Submission
 // Submission
 router.post('/:id/submit', authorize(['teacher', 'SUPER_ADMIN']), CourseController.submitForReview);
 
+// Bulk Delete
+router.post('/bulk-delete', authorize(['admin', 'SUPER_ADMIN']), CourseController.bulkDeleteCourses);
+
 // Delete Course
-router.delete('/:id', authorize(['teacher', 'SUPER_ADMIN']), CourseController.deleteCourse);
+router.delete('/:id', authorize(['teacher', 'admin', 'SUPER_ADMIN']), CourseController.deleteCourse);
 
 // Toggle Status (Activate/Deactivate)
-router.patch('/:id/status', authorize(['teacher', 'SUPER_ADMIN']), CourseController.toggleCourseStatus);
+router.patch('/:id/status', authorize(['teacher', 'admin', 'SUPER_ADMIN']), CourseController.toggleCourseStatus);
 
 export default router;
