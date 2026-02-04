@@ -4,17 +4,28 @@ import { CourseStatus, LessonType, ResourceType } from '@prisma/client';
 export class CourseService {
 
     // Create Draft Course
-    static async createCourse(teacherUserId: string, data: {
+    static async createCourse(creatorUserId: string, data: {
         title: string;
         description: string;
         categoryId: string;
         subjectId: string;
         thumbnail?: string;
         price?: number;
+        teacherId?: string; // Optional teacherId for Admin assignment
     }) {
-        // 1. Get Teacher ID from User ID
-        const teacher = await prisma.teacher.findUnique({ where: { userId: teacherUserId } });
-        if (!teacher) throw new Error('Teacher profile not found. Complete your profile first.');
+        let finalTeacherId: string;
+
+        if (data.teacherId) {
+            // Admin provided a teacherId directly
+            const teacher = await prisma.teacher.findUnique({ where: { id: data.teacherId } });
+            if (!teacher) throw new Error('Selected teacher profile not found.');
+            finalTeacherId = teacher.id;
+        } else {
+            // Fallback: This user is creating for themselves (must be a teacher)
+            const teacher = await prisma.teacher.findUnique({ where: { userId: creatorUserId } });
+            if (!teacher) throw new Error('Teacher profile not found. If you are an admin, please provide a teacherId.');
+            finalTeacherId = teacher.id;
+        }
 
         // 2. Create Course
         return prisma.course.create({
@@ -26,7 +37,7 @@ export class CourseService {
                 thumbnail: data.thumbnail,
                 price: data.price || 0,
                 duration: 0,
-                teacherId: teacher.id,
+                teacherId: finalTeacherId,
                 status: CourseStatus.DRAFT
             }
         });
@@ -67,7 +78,7 @@ export class CourseService {
                 // If course was APPROVED or REJECTED, and teacher edits it -> Reset to PENDING for re-review
                 // Admin edits do NOT reset status usually, or maybe they do? Let's keep it simple:
                 // If Teacher edits -> Reset. If Admin edits -> Keep status (Admin knows what they are doing).
-                status: (role === 'teacher' && (course.status === CourseStatus.APPROVED || course.status === CourseStatus.REJECTED))
+                status: (normalizedRole === 'TEACHER' && (course.status === CourseStatus.APPROVED || course.status === CourseStatus.REJECTED))
                     ? CourseStatus.PENDING
                     : course.status
             }
@@ -230,27 +241,37 @@ export class CourseService {
     }
 
     // Submit Course for Review
-    static async submitCourse(courseId: string, teacherUserId: string) {
-        const course = await prisma.course.findFirst({
-            where: { id: courseId, teacher: { userId: teacherUserId } }
-        });
+    static async submitCourse(courseId: string, userId: string, role: any) {
+        const currentRole = typeof role === 'object' ? role?.name : role;
+        const normalizedRole = (currentRole || '').toUpperCase();
 
-        if (!course) throw new Error('Course not found or unauthorized');
+        const course = await prisma.course.findUnique({ where: { id: courseId } });
+        if (!course) throw new Error('Course not found');
+
+        // Authorization Check
+        if (normalizedRole !== 'ADMIN' && normalizedRole !== 'SUPER_ADMIN') {
+            const teacher = await prisma.teacher.findUnique({ where: { userId } });
+            if (!teacher || course.teacherId !== teacher.id) throw new Error('Unauthorized');
+        }
+
         if (course.status !== CourseStatus.DRAFT && course.status !== CourseStatus.REJECTED) {
             throw new Error('Only Draft or Rejected courses can be submitted');
         }
 
+        const isAdminSubmission = normalizedRole === 'ADMIN' || normalizedRole === 'SUPER_ADMIN';
+        const newStatus = isAdminSubmission ? CourseStatus.APPROVED : CourseStatus.PENDING;
+
         return prisma.$transaction([
             prisma.course.update({
                 where: { id: courseId },
-                data: { status: CourseStatus.PENDING }
+                data: { status: newStatus }
             }),
             prisma.courseLog.create({
                 data: {
                     courseId,
-                    userId: teacherUserId,
-                    action: 'SUBMITTED',
-                    comment: 'Submitted for review'
+                    userId: userId,
+                    action: isAdminSubmission ? 'APPROVED' : 'SUBMITTED',
+                    comment: isAdminSubmission ? 'Course uploaded and auto-approved by Admin' : 'Submitted for review'
                 }
             })
         ]);

@@ -30,7 +30,7 @@ router.put('/lessons/:lessonId', authorize(['teacher', 'admin', 'SUPER_ADMIN']),
 
 // Submission
 // Submission
-router.post('/:id/submit', authorize(['teacher', 'SUPER_ADMIN']), CourseController.submitForReview);
+router.post('/:id/submit', authorize(['teacher', 'admin', 'SUPER_ADMIN']), CourseController.submitForReview);
 
 // Bulk Delete
 router.post('/bulk-delete', authorize(['admin', 'SUPER_ADMIN']), CourseController.bulkDeleteCourses);

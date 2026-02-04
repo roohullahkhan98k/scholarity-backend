@@ -5,10 +5,16 @@ export const createCourse = async (req: Request, res: Response) => {
     try {
         if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
 
-        const { title, description, categoryId, subjectId, thumbnail, price } = req.body;
+        const { title, description, categoryId, subjectId, thumbnail, price, teacherId } = req.body;
+
+        // Security check: Only Admins can set teacherId
+        const userRole = (req.user as any).role;
+        const normalizedRole = (typeof userRole === 'object' ? userRole.name : userRole || '').toUpperCase();
+
+        const effectiveTeacherId = (normalizedRole === 'ADMIN' || normalizedRole === 'SUPER_ADMIN') ? teacherId : undefined;
 
         const course = await CourseService.createCourse((req.user as any).id, {
-            title, description, categoryId, subjectId, thumbnail, price
+            title, description, categoryId, subjectId, thumbnail, price, teacherId: effectiveTeacherId
         });
 
         res.status(201).json(course);
@@ -108,7 +114,11 @@ export const submitForReview = async (req: Request, res: Response) => {
         if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
         const { id } = req.params;
 
-        const course = await CourseService.submitCourse(id as string, (req.user as any).id);
+        const userRole = typeof (req.user as any).role === 'object'
+            ? (req.user as any).role.name
+            : (req.user as any).role;
+
+        const course = await CourseService.submitCourse(id as string, (req.user as any).id, userRole);
         res.status(200).json(course);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
